@@ -35,13 +35,32 @@ while not disp.isDone():
 
     elif _method == "motion":
 
-        frame1 = cam.getImage()
-        time.sleep(0.5)
-        frame2 = cam.getImage()
-        time.sleep(0.5)
+        frame1 = cam.getImage().flipHorizontal()
+        time.sleep(0.2)
+        frame2 = cam.getImage().flipHorizontal()
+        time.sleep(0.2)
+        frame3 = cam.getImage().flipHorizontal()
+        time.sleep(0.2)
 
         diff = frame1 - frame2
+        diff2 = frame2 - frame3
 
+        #diff.sideBySide(diff2).show()
+
+        #diff3 = diff.__and__(diff2)
+        diff3 = diff.copy()
+
+        diff3 = diff3.dilate(5)
+        diff3 = diff3.colorDistance(Color.BLACK).threshold(100)#.stretch(100, 255)
+        blobs = diff3.findBlobs()#rect=(0, 0, diff.width, diff.height))
+        if blobs:
+            blobs.draw(autocolor=True)
+        diff3 = diff3.applyLayers()
+
+
+        frame3.sideBySide(diff3).show()
+
+        """
         grays = diff.colorDistance(Color.BLACK).dilate(20)
         blobs = grays.findBlobs()
 
@@ -74,7 +93,7 @@ while not disp.isDone():
             frame2 = frame2.applyLayers()
 
             frame2.sideBySide(grays).show()
-        
+        """
 
         #['__class__', '__delattr__', '__dict__', '__doc__', '__format__', '__getattribute__', '__getstate__', '__hash__', '__init__', '__module__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__setstate__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_mHeight', '_mMaxX', '_mMaxY', '_mMinX', '_mMinY', '_mSrcImgH', '_mSrcImgW', '_mWidth', '_pointInsidePolygon', '_updateExtents', 'above', 'angle', 'area', 'aspectRatio', 'below', 'blobImage', 'blobMask', 'bottomLeftCorner', 'bottomRightCorner', 'boundingBox', 'centroid', 'circleDistance', 'colorDistance', 'contains', 'contour', 'coordinates', 'corners', 'crop', 'distanceFrom', 'distanceToNearestEdge', 'doesNotContain', 'doesNotOverlap', 'draw', 'drawHoles', 'drawHull', 'drawMaskToLayer', 'drawMinRect', 'drawOutline', 'drawRect', 'extents', 'height', 'hull', 'hullImage', 'hullMask', 'hullRadius', 'image', 'isCircle', 'isContainedWithin', 'isNotContainedWithin', 'isRectangle', 'isSquare', 'left', 'length', 'm00', 'm01', 'm02', 'm10', 'm11', 'm12', 'm20', 'm21', 'mArea', 'mAspectRatio', 'mAvgColor', 'mBoundingBox', 'mContour', 'mConvexHull', 'mExtents', 'mHoleContour', 'mHortEdgeHist', 'mHu', 'mHullImg', 'mHullMask', 'mImg', 'mLabel', 'mLabelColor', 'mMask', 'mMinRectangle', 'mPerimeter', 'mVertEdgeHist', 'match', 'maxX', 'maxY', 'meanColor', 'minRect', 'minRectHeight', 'minRectWidth', 'minRectX', 'minRectY', 'minX', 'minY', 'notOnImageEdge', 'onImageEdge', 'overlaps', 'perimeter', 'pickle_skip_properties', 'points', 'radius', 'rectangleDistance', 'rectifyMajorAxis', 'right', 'rotate', 'seq', 'show', 'topLeftCorner', 'topRightCorner', 'width', 'x', 'y']
 
