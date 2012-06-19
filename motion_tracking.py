@@ -1,86 +1,106 @@
 #!/usr/bin/env python
 
-import cv
+import cv, time
+from freenect import sync_get_depth as get_depth, sync_get_video as get_video
 
-class Target:
+#ctx = fn.init()
+#if fn.num_devices(ctx) > 0:
+#    dev = fn.open_device(ctx, 0)
+#    
+#curr_tilt_state = fn.get_tilt_state(dev)
+#curr_tilt_degs = fn.get_tilt_degs(curr_tilt_state)
+        
+#print "Current Angle:", curr_tilt_degs
+        
+#fn.set_tilt_degs(dev, 15)
+#fn.shutdown(ctx)
 
-    def __init__(self):
-        #self.capture = cv.CaptureFromCAM(0)
-        self.capture = cv.CaptureFromFile("coffee.mov")
-        cv.NamedWindow("Target", 1)
+raw_sample = None
+while raw_sample == None:
+    (raw_sample, _) = get_video()
 
-    def run(self):
-        # Capture first frame to get size
-        frame = cv.QueryFrame(self.capture)
-        frame_size = cv.GetSize(frame)
-        color_image = cv.CreateImage(cv.GetSize(frame), 8, 3)
-        grey_image = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
-        moving_average = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_32F, 3)
+sample_screen = cv.GetImage(cv.fromarray(raw_sample))
+cv.Flip(sample_screen, sample_screen, 1)
+cv.CvtColor(sample_screen, sample_screen, cv.CV_RGB2BGR)
+screen_size = cv.GetSize(sample_screen)
 
-        first = True
+colour_image = cv.CreateImage(screen_size, 8, 3)
+grey_image = cv.CreateImage(screen_size, cv.IPL_DEPTH_8U, 1)
+moving_average = cv.CreateImage(screen_size, cv.IPL_DEPTH_32F, 3)
 
-        while True:
-            closest_to_left = cv.GetSize(frame)[0]
-            closest_to_right = cv.GetSize(frame)[1]
+cv.Smooth(sample_screen, sample_screen, cv.CV_GAUSSIAN, 3, 0)
+difference = cv.CloneImage(sample_screen)
+temp = cv.CloneImage(sample_screen)
+cv.ConvertScale(sample_screen, moving_average, 1.0, 0.0)
 
-            color_image = cv.QueryFrame(self.capture)
+while True: 
+    (raw_image, _) = get_video()
+    colour_image = cv.GetImage(cv.fromarray(raw_image))
+    cv.Flip(colour_image, colour_image, 1)
+    cv.CvtColor(colour_image, colour_image, cv.CV_RGB2BGR)
 
-            # Smooth to get rid of false positives
-            cv.Smooth(color_image, color_image, cv.CV_GAUSSIAN, 3, 0)
+    cv.Smooth(colour_image, colour_image, cv.CV_GAUSSIAN, 3, 0)
+    cv.RunningAvg(colour_image, moving_average, 0.020, None)
+    
+    cv.ConvertScale(moving_average, temp, 1.0, 0.0)
+    cv.AbsDiff(colour_image, temp, difference)
+    cv.CvtColor(difference, grey_image, cv.CV_RGB2GRAY)
+    cv.Threshold(grey_image, grey_image, 70, 255, cv.CV_THRESH_BINARY)
 
-            if first:
-                difference = cv.CloneImage(color_image)
-                temp = cv.CloneImage(color_image)
-                cv.ConvertScale(color_image, moving_average, 1.0, 0.0)
-                first = False
-            else:
-                cv.RunningAvg(color_image, moving_average, 0.020, None)
+    cv.Dilate(grey_image, grey_image, None, 18)
+    cv.Erode(grey_image, grey_image, None, 10)
 
-            # Convert the scale of the moving average.
-            cv.ConvertScale(moving_average, temp, 1.0, 0.0)
+    storage = cv.CreateMemStorage(0)
+    contour = cv.FindContours(grey_image, storage, cv.CV_RETR_CCOMP, cv.CV_CHAIN_APPROX_SIMPLE)
+    points = []
 
-            # Minus the current frame from the moving average.
-            cv.AbsDiff(color_image, temp, difference)
+    while contour:
+        bound_rect = cv.BoundingRect(list(contour))
+        contour = contour.h_next()
 
-            # Convert the image to grayscale.
-            cv.CvtColor(difference, grey_image, cv.CV_RGB2GRAY)
+        pt1 = (bound_rect[0], bound_rect[1])
+        pt2 = (bound_rect[0] + bound_rect[2], bound_rect[1] + bound_rect[3])
+        points.append(pt1)
+        points.append(pt2)
+        cv.Rectangle(colour_image, pt1, pt2, cv.CV_RGB(255, 0, 0), 1)
 
-            # Convert the image to black and white.
-            cv.Threshold(grey_image, grey_image, 70, 255, cv.CV_THRESH_BINARY)
+    cv.ShowImage("Target", colour_image)
 
-            # Dilate and erode to get people blobs
-            cv.Dilate(grey_image, grey_image, None, 18)
-            cv.Erode(grey_image, grey_image, None, 10)
+    c = cv.WaitKey(7)
+    if c == 27:
+        break
+    elif c != -1:
+        print "Button", c, "was pressed"
 
-            storage = cv.CreateMemStorage(0)
-            contour = cv.FindContours(grey_image, storage, cv.CV_RETR_CCOMP, cv.CV_CHAIN_APPROX_SIMPLE)
-            points = []
+    #depth = depth.astype(numpy.uint8)
+    
+    #depth = numpy.dstack((depth, depth, depth)).astype(numpy.uint8)
+    #d = numpy.hstack((depth, rgb)) 
+    
+    #cv.ShowImage("depth", cv.fromarray(numpy.array(d[::1, ::1, ::-1])))
 
-            while contour:
-                bound_rect = cv.BoundingRect(list(contour))
-                contour = contour.h_next()
+"""
+cam = Kinect()
+size = cam.getDepth().size()
+disp = Display((size[0]*2, size[1]))
 
-                pt1 = (bound_rect[0], bound_rect[1])
-                pt2 = (bound_rect[0] + bound_rect[2], bound_rect[1] + bound_rect[3])
-                points.append(pt1)
-                points.append(pt2)
-                cv.Rectangle(color_image, pt1, pt2, cv.CV_RGB(255,0,0), 1)
+while not disp.isDone():
 
-            #if len(points):
-            #    center_point = reduce(lambda a, b: ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2), points)
-            #    cv.Circle(color_image, center_point, 40, cv.CV_RGB(255, 255, 255), 1)
-            #    cv.Circle(color_image, center_point, 30, cv.CV_RGB(255, 100, 0), 1)
-            #    cv.Circle(color_image, center_point, 20, cv.CV_RGB(255, 255, 255), 1)
-            #    cv.Circle(color_image, center_point, 10, cv.CV_RGB(255, 100, 0), 1)
+    img1 = cam.getImage().flipHorizontal()
+    img2 = cam.getDepth().flipHorizontal()
 
-            cv.ShowImage("Target", color_image)
+    img2 = img2.stretch(0, 150)
+    
+    img2 = img2.edges()
+    
+    #blobs = img2.findBlobs()
+    #blobs.draw()
+    
+    img2 = img2.applyLayers()
 
-            # Listen for ESC key
-            c = cv.WaitKey(7) % 0x100
-            if c == 27:
-                break
-
-if __name__=="__main__":
-    t = Target()
-    t.run()
+    side = img1.sideBySide(img2)
+    side.save(disp)
+    
+    time.sleep(0.05)
+"""
 
