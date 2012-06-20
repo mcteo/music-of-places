@@ -3,17 +3,52 @@
 #from SimpleCV import *
 import cv
 import time
-import numpy
+import numpy as np
 from freenect import sync_get_depth as get_depth, sync_get_video as get_video
+
+def cv2array(im):
+    depth2dtype = {
+        cv.IPL_DEPTH_8U: 'uint8',
+        cv.IPL_DEPTH_8S: 'int8',
+        cv.IPL_DEPTH_16U: 'uint16',
+        cv.IPL_DEPTH_16S: 'int16',
+        cv.IPL_DEPTH_32S: 'int32',
+        cv.IPL_DEPTH_32F: 'float32',
+        cv.IPL_DEPTH_64F: 'float64',
+    }
+
+    arrdtype = im.depth
+    a = np.fromstring( im.tostring(), dtype = depth2dtype[im.depth], count = im.width * im.height * im.nChannels)
+    a.shape = (im.height, im.width, im.nChannels)
+    return a
+
+def array2cv(a):
+    dtype2depth = {
+        'uint8':   cv.IPL_DEPTH_8U,
+        'int8':    cv.IPL_DEPTH_8S,
+        'uint16':  cv.IPL_DEPTH_16U,
+        'int16':   cv.IPL_DEPTH_16S,
+        'int32':   cv.IPL_DEPTH_32S,
+        'float32': cv.IPL_DEPTH_32F,
+        'float64': cv.IPL_DEPTH_64F,
+    }
+    try:
+        nChannels = a.shape[2]
+    except:
+        nChannels = 1
+    cv_im = cv.CreateImageHeader((a.shape[1], a.shape[0]), dtype2depth[str(a.dtype)], nChannels)
+    cv.SetData(cv_im, a.tostring(), a.dtype.itemsize * nChannels * a.shape[1])
+    return cv_im
+
 
 while True:
 
     (raw_depth, _) = get_depth()
     (raw_video, _) = get_video()
 
-    numpy.clip(raw_depth, 0, (2**10)-1, raw_depth)
+    np.clip(raw_depth, 0, (2**10)-1, raw_depth)
     raw_depth = raw_depth >> 2
-    raw_depth = raw_depth.astype(numpy.uint8)#numpy.dstack((raw_depth, raw_depth, raw_depth))
+    raw_depth = raw_depth.astype(np.uint8)#np.dstack((raw_depth, raw_depth, raw_depth))
 
     video = cv.GetImage(cv.fromarray(raw_video))
     cv.CvtColor(video, video, cv.CV_RGB2BGR) 
@@ -96,23 +131,22 @@ while True:
 
 
             cv.Circle(video, startP, 5, (255, 0, 0), 2)
-            cv.Circle(video, depthP, 5, (0, 125, 125), 5)
+            cv.Circle(video, depthP, 5, (255, 255, 0), 2)
 
 
         font = cv.InitFont(cv.CV_FONT_HERSHEY_DUPLEX, 1, 1)
         cv.PutText(video, "Num of Fingers: " + str(fingerNum), (50, 50), font, (255, 255, 255)) 
 
-    # get biggest contour using conours.HNext and contours.Area;
 
-    # biggestContour.ApproxPoly
-    # draw
+    depth_arr = cv2array(depth)
+    video_arr = cv2array(video)
 
-    #biggestContour.GetConvexHull
-
-    #cv.WaitKey(1000)
-
-    cv.ShowImage("depth", depth)
-    cv.ShowImage("rgb", video)
+    d3 = np.dstack((depth_arr, depth_arr, depth_arr))
+    both = np.hstack((video_arr, d3))
+ 
+    cv.ShowImage("video - depth", array2cv(both))
+    #cv.ShowImage("depth", depth)
+    #cv.ShowImage("rgb", video)
 
     c = cv.WaitKey(10)
     if c != -1:
