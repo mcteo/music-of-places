@@ -22,7 +22,7 @@ while True:
     depth = cv.GetImage(cv.fromarray(raw_depth))
     cv.Flip(depth, depth, 1)
 
-    cv.Threshold(depth, depth, 150, 255, cv.CV_THRESH_BINARY)
+    cv.Threshold(depth, depth, 125, 255, cv.CV_THRESH_BINARY)
    
     temp = cv.CloneImage(depth)
 
@@ -34,6 +34,8 @@ while True:
     #cv.DrawContours(video, contours, (0, 255, 0), (0, 0, 255), 0)
 
     biggestContour = None
+    defects = None
+    fingerNum = 0
 
     area1 = 0
     area2 = 0
@@ -55,26 +57,50 @@ while True:
 
         biggestContour = currentContour
 
+        raw_hull = cv.ConvexHull2(biggestContour, storage, cv.CV_CLOCKWISE, 0)
         hull = cv.ConvexHull2(biggestContour, storage, cv.CV_CLOCKWISE, 1)
         
-        box = cv.MinAreaRect2(currentContour, storage)
-        print "box:", box
+        box = cv.MinAreaRect2(biggestContour)
 
-        points = (box[0], box[1])
-        print "points:", points
-        
-        cv.Rectangle(video, (int(box[0][0]), int(box[1][0])), (int(box[0][1]), int(box[1][1])), (255, 0, 0), 2)
-        
+        points = cv.BoxPoints(box)
+        points = map(lambda x: (int(x[0]), int(x[1])), points)
 
+        #cv.PolyLine(video, [points], True, (255, 0, 0), 2)
         cv.PolyLine(video, [hull], True, (200, 125, 75), 2)
 
-        #bb = cv.BoundingRect(points)
-        #center = ( (bb[0]+bb[2]) / 2, (bb[1]+bb[3]) / 2)
-        center = ( int( (points[0][0] + points[1][0]) / 2), int( (points[0][1] + points[1][1]) / 2) )
+        center = ( int(box[0][0]), int(box[0][1]) )
         cv.Circle(video, center, 3, (200, 125, 75), 2)
-    
-        
 
+        filteredHull = []
+        for i in range(len(hull) - 1):
+            if ( ( (hull[i][0] - hull[i + 1][0])**2 + (hull[i][1] - hull[i + 1][1])**2  )**0.5 ) > (box[1][0] / 10):
+                filteredHull.append(hull[i])
+       
+        defects = cv.ConvexityDefects(biggestContour, raw_hull, storage)
+
+        #print defects
+
+    if defects is not None:
+
+        for defect in defects:
+
+            startP = ( int(defect[0][0]), int(defect[0][1]) )
+            endP = ( int(defect[1][0]), int(defect[1][1]) )
+            depthP = ( int(defect[2][0]), int(defect[2][1]) )
+            
+            if ( (startP[1] < box[0][1]) or (depthP < box[0][1]) ) and \
+                 ( startP[1] < depthP[1] ) and \
+                 ( (( (startP[0] - depthP[0])**2 + (startP[1] - depthP[1])**2 )**0.5 ) > (box[1][1] / 6.5) ):
+                fingerNum += 1
+                cv.Line(video, startP, depthP, (0, 255, 0), 2) 
+
+
+            cv.Circle(video, startP, 5, (255, 0, 0), 2)
+            cv.Circle(video, depthP, 5, (0, 125, 125), 5)
+
+
+        font = cv.InitFont(cv.CV_FONT_HERSHEY_DUPLEX, 1, 1)
+        cv.PutText(video, "Num of Fingers: " + str(fingerNum), (50, 50), font, (255, 255, 255)) 
 
     # get biggest contour using conours.HNext and contours.Area;
 
@@ -85,8 +111,8 @@ while True:
 
     #cv.WaitKey(1000)
 
-    cv.ShowImage("rgb", video)
     cv.ShowImage("depth", depth)
+    cv.ShowImage("rgb", video)
 
     c = cv.WaitKey(10)
     if c != -1:
