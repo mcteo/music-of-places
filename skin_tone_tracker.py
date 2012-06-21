@@ -60,13 +60,56 @@ cv.CvtColor(frame, frame, cv.CV_RGB2BGR)
 cv.Flip(frame, frame, 1)
 
 frame_size = cv.GetSize(frame)
-
+"""
 img_YCrCb = cv.CreateImage(frame_size, frame.depth, frame.nChannels)
 chan_Y  = cv.CreateImage(frame_size, cv.IPL_DEPTH_8U, 1)
 chan_Cr = cv.CreateImage(frame_size, cv.IPL_DEPTH_8U, 1)
 chan_Cb = cv.CreateImage(frame_size, cv.IPL_DEPTH_8U, 1)
-
+"""
 mask = cv.CreateImage(frame_size, cv.IPL_DEPTH_8U, 1)
+
+skin_colours = []
+depth_arr = cv2array(mask)
+
+def onMouse(event, x, y, flags, params):
+
+    event2str = {
+        cv.CV_EVENT_MOUSEMOVE : "Mouse movement",
+        cv.CV_EVENT_LBUTTONDOWN : "Left button down",
+        cv.CV_EVENT_RBUTTONDOWN : "Right button down",
+        cv.CV_EVENT_MBUTTONDOWN : "Middle button down",
+        cv.CV_EVENT_LBUTTONUP : "Left button up",
+        cv.CV_EVENT_RBUTTONUP : "Right button up",
+        cv.CV_EVENT_MBUTTONUP : "Middle button up",
+        cv.CV_EVENT_LBUTTONDBLCLK : "Left button double click",
+        cv.CV_EVENT_RBUTTONDBLCLK : "Right button double click",
+        cv.CV_EVENT_MBUTTONDBLCLK : "Middle button double click",
+    }
+
+    flag2str = {
+        cv.CV_EVENT_FLAG_LBUTTON : "Left button pressed",
+        cv.CV_EVENT_FLAG_RBUTTON : "Right button pressed",
+        cv.CV_EVENT_FLAG_MBUTTON : "Middle button pressed",
+        cv.CV_EVENT_FLAG_CTRLKEY : "Control key pressed",
+        cv.CV_EVENT_FLAG_SHIFTKEY : "Shift key pressed",
+        cv.CV_EVENT_FLAG_ALTKEY : "Alt key pressed",
+    }
+
+    fflags = []
+    while (flags > 0):
+        bigger = filter(lambda x: x <= flags, [1, 2, 4, 8, 16, 32])
+        fflags.append(bigger[-1])
+        flags -= bigger[-1]
+
+    #print "got a", event2str[event], "event @ (", x, ",", y, ") with[", "|".join(map(lambda x: flag2str[x], fflags)), "] flags"
+
+    (video, depth) = params
+
+    if event == cv.CV_EVENT_LBUTTONUP:
+        if (x < 640) and (y < 479) and (x > 0) and (y > 0):
+            skin_colours.append( ",".join(map(lambda x: str(x), video[x][y])))
+
+cv.NamedWindow("skinmask")
 
 while True:
     (raw_depth, _) = get_depth()
@@ -83,40 +126,43 @@ while True:
     depth = cv.GetImage(cv.fromarray(raw_depth))
     cv.Flip(depth, depth, 1)
 
-    cv.CvtColor(video, img_YCrCb, cv.CV_BGR2YCrCb)
+
+
+
+
+
+
+
+
+
+    # Just too slow to even think about implementing in pure python
+    # Literally 1 frame every 14 seconds
+
+    """
+
+    cv.CvtColor(video, img_YCrCb, cv.CV_RGB2YCrCb)
     cv.Split(img_YCrCb, chan_Y, chan_Cr, chan_Cb, None)
 
-    """
-    cv.ShowImage("chan_Y", chan_Y)
-    cv.ShowImage("chan_Cr", chan_Cr)
-    cv.ShowImage("chan_Cb", chan_Cb)
+    #pY =  chan_Y#cv2array(chan_Y)
+    #pCr = chan_Cr#cv2array(chan_Cr)
+    #pCb = chan_Cb#cv2array(chan_Cb)
+    #pMask = mask#cv2array(mask)
 
-    cv.WaitKey(-1)
+    pY =  np.array(cv.GetMat(chan_Y))#.astype(np.uint8)
+    pCr = np.array(cv.GetMat(chan_Cr))#.astype(np.uint8)
+    pCb = np.array(cv.GetMat(chan_Cb))#.astype(np.uint8)
+    pMask = np.array(cv.GetMat(mask))#.astype(np.uint8)
 
-    ""  
-    IplImage *imgYCrCb = cvCreateImage(imageSize, img->depth, img->nChannels);  
-    cvCvtColor(img,imgYCrCb,CV_BGR2YCrCb);  
-    cvSplit(imgYCrCb, imgY, imgCr, imgCb, 0);  
-    int y, cr, cb, l, x1, y1, value;  
-    unsigned char *pY, *pCr, *pCb, *pMask;  
-    """
-
-    print "hello1"
-
-    pY =  chan_Y#cv2array(chan_Y)  
-    pCr = chan_Cr#cv2array(chan_Cr)
-    pCb = chan_Cb#cv2array(chan_Cb)
-    pMask = mask#cv2array(mask)
     cv.SetZero(mask) 
    
     print "hello2"
 
-    for x in range(mask.height):
-        for y in range(mask.width):
+    for x in range(mask.height-1):
+        for y in range(mask.width-1):
 
-            y  = cv.Get2D(pY, x, y)
-            cr = cv.Get2D(pCr, x, y)
-            cb = cv.Get2D(pCb, x, y)
+            yz  = pY[x][y]
+            cr = pCr[x][y]
+            cb = pCb[x][y]
             cb -= 109 
             cr -= 152
   
@@ -126,29 +172,42 @@ while True:
             y1 = y1 * 73 / 1024;  
             value = x1 * x1 + y1 * y1;  
    
-            if ( y < 100):
+            if ( yz < 100):
                 if value < 700:
-                    cv.Set2D(pMask, x, y, 255)
+                    pMask[x][y] = 255
                 else:
-                    cv.Set2D(pMask, x, y, 0)
+                    pMask[x][y] = 0
             else:
                 if  value < 850:
-                    cv.Set2D(pMask, x, y, 255)
+                    pMask[x][y] = 255
                 else:
-                    cv.Set2D(pMask, x, y, 0)
-            
+                    pMask[x][y] = 0
+    """
 
-    depth_arr = pMask#cv2array(mask)
+    
+    depth_arr = cv2array(mask)
     video_arr = cv2array(video)
 
+    # Even slower method!
+    # literally about 1 frame every 25 seconds!!!
+
+    """
+    for x in range(mask.height-1):
+        for y in range(mask.width-1):
+            if ",".join(map(lambda x: str(x), video_arr[x][y])) in skin_colours:
+                depth_arr[x][y] = 255
+            else:
+                depth_arr[x][y] = 0
+
+    cv.SetMouseCallback("skinmask", onMouse, (video_arr, depth_arr))
+    
+    print skin_colours
+    """
+
     d3 = np.dstack((depth_arr, depth_arr, depth_arr))
-    
-    print len(d3), len(d3[-1]), len(d3[-1][-1])
-    
-    
     both = np.hstack((video_arr, d3))
  
-    cv.ShowImage("both", array2cv(both))
+    cv.ShowImage("skinmask", array2cv(both))
 
     c = cv.WaitKey(10)
     if c != -1:
