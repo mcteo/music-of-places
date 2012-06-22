@@ -19,22 +19,6 @@ def cv2array(im):
     a.shape = (im.height, im.width, im.nChannels)
     return a
 
-def cv21darray(im):
-    depth2dtype = {
-        cv.IPL_DEPTH_8U: 'uint8',
-        cv.IPL_DEPTH_8S: 'int8',
-        cv.IPL_DEPTH_16U: 'uint16',
-        cv.IPL_DEPTH_16S: 'int16',
-        cv.IPL_DEPTH_32S: 'int32',
-        cv.IPL_DEPTH_32F: 'float32',
-        cv.IPL_DEPTH_64F: 'float64',
-    }
-
-    arrdtype = im.depth
-    a = np.fromstring( im.tostring(), dtype = depth2dtype[im.depth], count = im.width * im.height * im.nChannels)
-    #a.shape = (1, 1, im.nChannels)
-    return a
-
 def array2cv(a):
     dtype2depth = {
         'uint8':   cv.IPL_DEPTH_8U,
@@ -60,56 +44,35 @@ cv.CvtColor(frame, frame, cv.CV_RGB2BGR)
 cv.Flip(frame, frame, 1)
 
 frame_size = cv.GetSize(frame)
-"""
-img_YCrCb = cv.CreateImage(frame_size, frame.depth, frame.nChannels)
-chan_Y  = cv.CreateImage(frame_size, cv.IPL_DEPTH_8U, 1)
-chan_Cr = cv.CreateImage(frame_size, cv.IPL_DEPTH_8U, 1)
-chan_Cb = cv.CreateImage(frame_size, cv.IPL_DEPTH_8U, 1)
-"""
+
+img_HSV = cv.CreateImage(frame_size, frame.depth, frame.nChannels)
+
+Hue1 = cv.CreateImage(frame_size, cv.IPL_DEPTH_8U, 1)
+Sat1 = cv.CreateImage(frame_size, cv.IPL_DEPTH_8U, 1)
+Val1 = cv.CreateImage(frame_size, cv.IPL_DEPTH_8U, 1)
+
+cv.SetZero(Hue1)
+cv.SetZero(Sat1)
+cv.SetZero(Val1)
+
+Hue2 = cv.CreateImage(frame_size, cv.IPL_DEPTH_8U, 1)
+Sat2 = cv.CreateImage(frame_size, cv.IPL_DEPTH_8U, 1)
+Val2 = cv.CreateImage(frame_size, cv.IPL_DEPTH_8U, 1)
+
+cv.SetZero(Hue2)
+cv.SetZero(Sat2)
+cv.SetZero(Val2)
+
 mask = cv.CreateImage(frame_size, cv.IPL_DEPTH_8U, 1)
 
-skin_colours = []
-depth_arr = cv2array(mask)
+HueUp = 173.4
+HueLw = 58.65
 
-def onMouse(event, x, y, flags, params):
+SatUp = 50.0
+SatLw = 0.0
 
-    event2str = {
-        cv.CV_EVENT_MOUSEMOVE : "Mouse movement",
-        cv.CV_EVENT_LBUTTONDOWN : "Left button down",
-        cv.CV_EVENT_RBUTTONDOWN : "Right button down",
-        cv.CV_EVENT_MBUTTONDOWN : "Middle button down",
-        cv.CV_EVENT_LBUTTONUP : "Left button up",
-        cv.CV_EVENT_RBUTTONUP : "Right button up",
-        cv.CV_EVENT_MBUTTONUP : "Middle button up",
-        cv.CV_EVENT_LBUTTONDBLCLK : "Left button double click",
-        cv.CV_EVENT_RBUTTONDBLCLK : "Right button double click",
-        cv.CV_EVENT_MBUTTONDBLCLK : "Middle button double click",
-    }
-
-    flag2str = {
-        cv.CV_EVENT_FLAG_LBUTTON : "Left button pressed",
-        cv.CV_EVENT_FLAG_RBUTTON : "Right button pressed",
-        cv.CV_EVENT_FLAG_MBUTTON : "Middle button pressed",
-        cv.CV_EVENT_FLAG_CTRLKEY : "Control key pressed",
-        cv.CV_EVENT_FLAG_SHIFTKEY : "Shift key pressed",
-        cv.CV_EVENT_FLAG_ALTKEY : "Alt key pressed",
-    }
-
-    fflags = []
-    while (flags > 0):
-        bigger = filter(lambda x: x <= flags, [1, 2, 4, 8, 16, 32])
-        fflags.append(bigger[-1])
-        flags -= bigger[-1]
-
-    #print "got a", event2str[event], "event @ (", x, ",", y, ") with[", "|".join(map(lambda x: flag2str[x], fflags)), "] flags"
-
-    (video, depth) = params
-
-    if event == cv.CV_EVENT_LBUTTONUP:
-        if (x < 640) and (y < 479) and (x > 0) and (y > 0):
-            skin_colours.append( ",".join(map(lambda x: str(x), video[x][y])))
-
-cv.NamedWindow("skinmask")
+ValUp = 255.0
+ValLw = 0.0
 
 while True:
     (raw_depth, _) = get_depth()
@@ -126,93 +89,101 @@ while True:
     depth = cv.GetImage(cv.fromarray(raw_depth))
     cv.Flip(depth, depth, 1)
 
+    cv.CvtColor(video, img_HSV, cv.CV_BGR2HSV)
+    cv.Split(img_HSV, Hue1, Sat1, Val1, None)
 
+    cv.ShowImage("Hue1", Hue1)
+    cv.ShowImage("Sat1", Sat1)
+    cv.ShowImage("Val1", Val1)
 
+    #           (src,  dest,   border, upper limit  type    [CV_THRESH_TOZERO, CV_THRESH_TOZERO_INV]
 
+    #cv.Threshold(Hue1, Hue2, 255, 255, cv.CV_THRESH_TRUNC)
+    #print cv2array(Hue1)
 
+    cv.Threshold(Hue1, Hue2, HueLw, 255, cv.CV_THRESH_TOZERO)
+    cv.Threshold(Hue2, Hue2, HueUp, 255, cv.CV_THRESH_TOZERO_INV)
 
+    cv.Threshold(Sat1, Sat2, SatLw, 255, cv.CV_THRESH_TOZERO)
+    cv.Threshold(Sat2, Sat2, SatUp, 255, cv.CV_THRESH_TOZERO_INV)
 
-
-
-
-    # Just too slow to even think about implementing in pure python
-    # Literally 1 frame every 14 seconds
-
-    """
-
-    cv.CvtColor(video, img_YCrCb, cv.CV_RGB2YCrCb)
-    cv.Split(img_YCrCb, chan_Y, chan_Cr, chan_Cb, None)
-
-    #pY =  chan_Y#cv2array(chan_Y)
-    #pCr = chan_Cr#cv2array(chan_Cr)
-    #pCb = chan_Cb#cv2array(chan_Cb)
-    #pMask = mask#cv2array(mask)
-
-    pY =  np.array(cv.GetMat(chan_Y))#.astype(np.uint8)
-    pCr = np.array(cv.GetMat(chan_Cr))#.astype(np.uint8)
-    pCb = np.array(cv.GetMat(chan_Cb))#.astype(np.uint8)
-    pMask = np.array(cv.GetMat(mask))#.astype(np.uint8)
-
-    cv.SetZero(mask) 
-   
-    print "hello2"
-
-    for x in range(mask.height-1):
-        for y in range(mask.width-1):
-
-            yz  = pY[x][y]
-            cr = pCr[x][y]
-            cb = pCb[x][y]
-            cb -= 109 
-            cr -= 152
-  
-            x1 = (819 * cr - 614 * cb) / 32 + 51;  
-            y1 = (819 * cr + 614 * cb) / 32 + 77;  
-            x1 = x1 * 41 / 1024;  
-            y1 = y1 * 73 / 1024;  
-            value = x1 * x1 + y1 * y1;  
-   
-            if ( yz < 100):
-                if value < 700:
-                    pMask[x][y] = 255
-                else:
-                    pMask[x][y] = 0
-            else:
-                if  value < 850:
-                    pMask[x][y] = 255
-                else:
-                    pMask[x][y] = 0
-    """
-
+    cv.Threshold(Val1, Val2, ValLw, 255, cv.CV_THRESH_TOZERO)
+    cv.Threshold(Val2, Val2, ValUp, 255, cv.CV_THRESH_TOZERO_INV)
+ 
+    #cv.Threshold(Val1, Val2, 255, 255, cv.CV_THRESH_TRUNC)
+    #cv.CloneImage(Val1, Val2)
+    #Val2 = Val1
     
+
+    #cv.Threshold(Sat1, Sat2, 0, 255, cv.CV_THRESH_BINARY)
+    #cv.Threshold(Val1, Val2, 0, 255, thresholdType)
+
+    """
+
+    Sat should be in [0, 50]
+    Hue should be in [0.23, 0.68] or [58.65, 173.4] 
+
+    """
+    """
+def func(pixel):
+    h, s, v = pixel
+    if (h >= 0) and (h <= 50) and (s >= 58.65) and (s <= 173.4):
+        return pixel
+    else:
+        return [0, 255, 0]
+    """
+    
+
+    cv.ShowImage("Hue2", Hue2)
+    cv.ShowImage("Sat2", Sat2)
+    cv.ShowImage("Val2", Val2)
+
+    cv.Merge(Hue2, Sat2, Val2, None, img_HSV)
+    cv.CvtColor(img_HSV, img_HSV, cv.CV_HSV2BGR)
+
+    cv.ShowImage("HSV2", img_HSV)
+
     depth_arr = cv2array(mask)
     video_arr = cv2array(video)
-
-    # Even slower method!
-    # literally about 1 frame every 25 seconds!!!
-
-    """
-    for x in range(mask.height-1):
-        for y in range(mask.width-1):
-            if ",".join(map(lambda x: str(x), video_arr[x][y])) in skin_colours:
-                depth_arr[x][y] = 255
-            else:
-                depth_arr[x][y] = 0
-
-    cv.SetMouseCallback("skinmask", onMouse, (video_arr, depth_arr))
-    
-    print skin_colours
-    """
 
     d3 = np.dstack((depth_arr, depth_arr, depth_arr))
     both = np.hstack((video_arr, d3))
  
     cv.ShowImage("skinmask", array2cv(both))
 
+    print "Hue [", HueLw, ",", HueUp, "], Sat [", SatLw, ",", SatUp, "], Val [", ValLw, ",", ValUp, "]"
+
     c = cv.WaitKey(10)
     if c != -1:
         if c == 27:
             break
+        elif c == 63232:
+            HueUp += 1
+        elif c == 63233:
+            HueUp -= 1
+        elif c == 63234:
+            HueLw += 1
+        elif c == 63235: 
+            HueLw -= 1
+        
+        elif c == 119:
+            SatUp += 1
+        elif c == 115:
+            SatUp -= 1
+        elif c == 97:
+            SatLw += 1
+        elif c == 100:    
+            SatLw -= 1
+
+        elif c == 105:
+            ValUp += 1
+        elif c == 107:
+            ValUp -= 1
+        elif c == 106:
+            ValLw += 1
+        elif c == 108:    
+            ValLw -= 1
+
         else:
             print "button", c, "pressed"
 

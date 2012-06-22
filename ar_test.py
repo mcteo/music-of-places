@@ -45,21 +45,41 @@ cv.Flip(frame, frame, 1)
 
 frame_size = cv.GetSize(frame)
 
-img_HSV = cv.CreateImage(frame_size, frame.depth, frame.nChannels)
+def onMouse(event, x, y, flags, params):
 
-HueUp = 190#173.4
-HueLw = 100#58.65
+    event2str = {
+        cv.CV_EVENT_MOUSEMOVE : "Mouse movement",
+        cv.CV_EVENT_LBUTTONDOWN : "Left button down",
+        cv.CV_EVENT_RBUTTONDOWN : "Right button down",
+        cv.CV_EVENT_MBUTTONDOWN : "Middle button down",
+        cv.CV_EVENT_LBUTTONUP : "Left button up",
+        cv.CV_EVENT_RBUTTONUP : "Right button up",
+        cv.CV_EVENT_MBUTTONUP : "Middle button up",
+        cv.CV_EVENT_LBUTTONDBLCLK : "Left button double click",
+        cv.CV_EVENT_RBUTTONDBLCLK : "Right button double click",
+        cv.CV_EVENT_MBUTTONDBLCLK : "Middle button double click",
+    }
 
-Sat = 70.0
+    flag2str = {
+        cv.CV_EVENT_FLAG_LBUTTON : "Left button pressed",
+        cv.CV_EVENT_FLAG_RBUTTON : "Right button pressed",
+        cv.CV_EVENT_FLAG_MBUTTON : "Middle button pressed",
+        cv.CV_EVENT_FLAG_CTRLKEY : "Control key pressed",
+        cv.CV_EVENT_FLAG_SHIFTKEY : "Shift key pressed",
+        cv.CV_EVENT_FLAG_ALTKEY : "Alt key pressed",
+    }
 
+    fflags = []
+    while (flags > 0):
+        bigger = filter(lambda x: x <= flags, [1, 2, 4, 8, 16, 32])
+        fflags.append(bigger[-1])
+        flags -= bigger[-1]
 
-def func(pixel):
-    h, s, v = pixel
-    if (h >= 0) and (h <= 50) and (s >= 58.65) and (s <= 173.4):
-        return pixel
-    else:
-        return [0, 255, 0]
+    (video, depth) = params
 
+    if event == cv.CV_EVENT_LBUTTONUP:
+        if (x < 640) and (y < 479) and (x > 0) and (y > 0):
+            pass
 
 while True:
     (raw_depth, _) = get_depth()
@@ -76,59 +96,21 @@ while True:
     depth = cv.GetImage(cv.fromarray(raw_depth))
     cv.Flip(depth, depth, 1)
 
-    cv.CvtColor(video, img_HSV, cv.CV_BGR2HSV)
-
-    arr = cv2array(img_HSV)
-    
-    for x in xrange(480):
-        for y in xrange(640):
-            h, s, v = arr[x][y]
-            if (h >= HueLw) and (h <= HueUp) and (s >= 0) and (s <= Sat):
-                continue
-            else:
-                arr[x][y] = np.array([0, 255, 0]).astype(np.uint8)
-
-           #arr[x][y] = func(arr[x][y])
-
-    #arr = np.array(map(lambda x: map(func, x), arr)).astype(np.uint8)
 
 
 
-    img_HSV = array2cv(arr)
+    depth_arr = cv2array(depth)
+    video_arr = cv2array(video)
 
-    cv.CvtColor(img_HSV, img_HSV, cv.CV_HSV2BGR)
-
-    cv.ShowImage("HSV2", img_HSV)
-
-    #video_arr = cv2array(video)
-
-    #d3 = np.dstack((depth_arr, depth_arr, depth_arr))
-    #both = np.hstack((video_arr, d3))
+    d3 = np.dstack((depth_arr, depth_arr, depth_arr))
+    both = np.hstack((video_arr, d3))
  
-    #cv.ShowImage("skinmask", array2cv(both))
-
-    print "Hue is being kept in the range of [", HueLw, ",", HueUp, "] and Sat is at [", 0, ",", Sat, "]"
+    cv.ShowImage("both", array2cv(both))
 
     c = cv.WaitKey(10)
     if c != -1:
         if c == 27:
             break
-        elif c == 63232:
-            print "UP"
-            HueUp += 0.25
-        elif c == 63233:
-            print "DOWN"
-            HueUp -= 0.25
-        elif c == 63234:
-            print "LEFT"
-            HueLw += 0.25
-        elif c == 63235: 
-            print "RIGHT"
-            HueLw -= 0.25
-        elif c == 119:
-            Sat += 1
-        elif c == 115:
-            Sat -= 1
         else:
             print "button", c, "pressed"
 
