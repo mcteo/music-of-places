@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import cv, numpy as np, matplotlib.pyplot as ml , sys, os
+import cv, numpy as np, matplotlib.pyplot as ml , sys, os, pickle
 from freenect import sync_get_video as get_video
 
 def cv2array(im):
@@ -57,21 +57,36 @@ def get_channel_palettes(img):
 
     return (countH, countS, countV)
 
+def add_diff_shapes(a, b, offset=(0, 0)):
+
+    max_x = min(a.shape[0], b.shape[0])
+    max_y = min(a.shape[1], b.shape[1])
+
+    min_x = max(offset[0], 0)
+    min_y = max(offset[1], 0)
+
+    a[min_x:max_x:, min_y:max_y:] += b[min_x:max_x:, min_y:max_y:] 
+    return a
+
 def get_multi_channel_palettes(imgs):
+    countH = countS = countV = 0
+    
     for img in imgs:
         HSV = cv.CreateImage(cv.GetSize(img), img.depth, img.nChannels)
         cv.CvtColor(img, HSV, cv.CV_RGB2HSV)
 
         arr = cv2array(HSV)
-        
+
+        #print chanH.shape, chanS.shape, chanV.shape
+
         try:
-            chanH = np.hstack((chanH, arr[::, ::, 0]))
-            chanS = np.hstack((chanH, arr[::, ::, 1]))
-            chanV = np.hstack((chanH, arr[::, ::, 2]))
+            chanH = np.hstack((chanH, arr[::, ::, 0].flatten()))
+            chanS = np.hstack((chanS, arr[::, ::, 1].flatten()))
+            chanV = np.hstack((chanV, arr[::, ::, 2].flatten()))
         except UnboundLocalError:
-            chanH = arr[::, ::, 0]
-            chanS = arr[::, ::, 1]
-            chanV = arr[::, ::, 2]
+            chanH = arr[::, ::, 0].flatten()
+            chanS = arr[::, ::, 1].flatten()
+            chanV = arr[::, ::, 2].flatten()
 
         countH += np.bincount(chanH.flatten())
         countS += np.bincount(chanS.flatten())
@@ -102,6 +117,10 @@ if __name__ == "__main__":
         print "Opening file <", image, "> with size", cv.GetSize(img)
    
     (H, S, V) = get_multi_channel_palettes(images)
+
+    pickle.dump((H, S, V), open("HSV_out.pickle", "w"))
+
+    #[max(np.where(a==0)[0])+1:]
 
     N = 255
 
