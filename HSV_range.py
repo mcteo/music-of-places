@@ -120,7 +120,21 @@ if __name__ == "__main__":
 
     pickle.dump((H, S, V), open("HSV_out.pickle", "w"))
 
-    #[max(np.where(a==0)[0])+1:]
+    h = H.copy()
+    s = S.copy()
+    v = V.copy()
+
+    h.sort()
+    s.sort()
+    v.sort()
+
+    h = h[max(np.where(h==0)[0])+1:]
+    s = s[max(np.where(s==0)[0])+1:]
+    v = v[max(np.where(v==0)[0])+1:]
+
+    
+
+
 
     N = 255
 
